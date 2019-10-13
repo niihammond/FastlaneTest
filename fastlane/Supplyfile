@@ -1,0 +1,8 @@
+# For all available options run `supply --help`
+####################################################################################
+
+json_key ENV["JSON_KEY_FILE"] 
+
+package_name ENV["PACKAGE_NAME"]
+
+metadata_path "./metadata/google-play"

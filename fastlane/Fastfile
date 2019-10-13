@@ -1,0 +1,346 @@
+# Customise this file, documentation can be found here:
+# https://github.com/fastlane/fastlane/tree/master/fastlane/docs
+# All available actions: https://docs.fastlane.tools/actions
+# can also be listed using the `fastlane actions` command
+
+# Change the syntax highlighting to Ruby
+# All lines starting with a # are ignored when running `fastlane`
+
+# If you want to automatically update fastlane if a new version is available:
+# update_fastlane
+
+# This is the minimum version number required.
+# Update this, if you use features of a newer version
+fastlane_version "2.64.0"
+fastlane_require 'time'
+fastlane_require 'commander'
+fastlane_require 'pathname'
+fastlane_require 'dotenv'
+
+#default_platform :ios
+
+before_all do
+	Dotenv.overload '.env.beta'
+	Dotenv.overload '.env.secret'
+
+	#ensure_git_branch
+  #ensure_git_status_clean
+  #git_pull
+end
+
+# Constants
+APP_GIT = ENV["APP_GIT"]
+APP_ID = ENV["APP_ID"]
+APP_NAME = ENV["APP_NAME"]
+APP_SCHEME = ENV["APP_SCHEME"]
+APP_PROJECT = ENV["APP_PROJECT"]
+ITC_TEAM_ID = ENV["TEAM_ID"]
+ITC_USERNAME = ENV["APPLE_ID"]
+BOT_ID = ENV["BOT_ID"]
+
+GOOGLE_PACKAGE = ENV["PACKAGE_NAME"]
+GOOGLE_PLAY_JSON_KEY = ENV["JSON_KEY_FILE"]
+GOOGLE_KEYSTORE = ENV["PACKAGE_NAME"]
+
+
+
+platform :android do
+	desc "Upload application metadata to Google Play"
+	lane :metadata do
+
+	    supply(
+	      json_key: GOOGLE_PLAY_JSON_KEY,
+	      package_name: ANDROID_PACKAGE,
+	      metadata_path: "metadata/google-play",
+	      skip_upload_metadata: false,
+	      skip_upload_images: true,
+	      skip_upload_screenshots: true
+	    )
+
+	end
+
+  desc 'Build the Android application.'
+  private_lane :build do
+    gradle(task: 'clean', project_dir: 'android/')
+    gradle(task: 'assemble', build_type: 'Release', project_dir: 'android/')
+  end
+
+  desc 'Bump version code.'
+  private_lane :bump_version_code do |options|
+    path = '../android/app/build.gradle'
+    re = /versionCode\s+(\d+)/
+    s = File.read(path)
+    versionCode = google_play_track_version_codes(track: options[:track])[0]
+    s[re, 1] = (versionCode + 1).to_s
+
+    f = File.new(path, 'w')
+    f.write(s)
+    f.close
+    git_commit(path: ["./android/app/build.gradle"], message: 'Bump versionCode')
+  end
+
+  desc 'Ship to Playstore Alph testing.'
+  lane :beta do
+    bump_version_code(track: "alpha")
+    build
+    supply(track: 'alpha', track_promote_to: 'alpha')
+    add_git_tag(
+      tag: "@Alpha-android-v1.0-vc" + google_play_track_version_codes(track: "alpha")[0].to_s
+    )
+    push_to_git_remote
+  end
+
+  desc 'Release to app store.'
+  lane :playstore do
+    supply(track: 'alpha', track_promote_to: "production")
+    add_git_tag(
+      tag: "@android-v1.0-vc" + google_play_track_version_codes(track: "production")[0].to_s
+    )
+    push_to_git_remote
+  end
+end
+
+platform :ios do
+
+
+	desc "Create App online "
+	lane :SetupApp do
+		produce(
+		  username: BOT_ID,
+		  app_identifier: APP_ID,
+		  app_name: APP_NAME,
+		  language: "English",
+		  app_version: "1.0"
+		)
+
+		# Load metadaata for the App
+		metadata
+
+		# Create certificates for the app
+		match(type: "appstore", force: true, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	  match(type: "development", force: true, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	  match(type: "adhoc", force: true, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+
+	end
+
+  desc "Runs all the tests"
+  lane :test do
+    scan
+  end
+
+	desc "Fetch and install the distribution certificates and provisioning profiles"
+	lane :certificates do
+	  match(type: "appstore", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	  match(type: "development", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	  match(type: "adhoc", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	end
+
+	desc 'Create Push Notifications certs'
+	lane :pushcerts do
+		get_push_certificate(development: 'true', output_path: "./fastlane")
+		get_push_certificate(output_path: "./fastlane")
+	end
+
+	desc "Registers developer devices with iTunes Connect"
+	lane :devices do
+
+	  register_devices(devices_file: "./Fastlane/iTunesConnectDevices", username: BOT_ID , team_id: ITC_TEAM_ID)
+
+	end
+
+	desc 'Build the iOS application.'
+	private_lane :build do
+		certificates
+		increment_build_number(xcodeproj: APP_PROJECT)
+		commit_version_bump(
+			message: "Fastlane iOS: new build #{lane_context[SharedValues::BUILD_NUMBER]} ",
+			xcodeproj: APP_PROJECT
+		)
+		gym(scheme: APP_SCHEME, project: APP_PROJECT)
+	end
+
+ 	desc 'Ship to Testflight.'
+	desc "Submit a new Beta Build to Apple TestFlight"
+  desc "This will also make sure the profile is up to date"
+	lane :beta do
+		build
+		changelog_from_git_commits # this will generate the changelog based on your last commits
+
+		pilot(
+      app_identifier: APP_ID,
+      username: ITC_USERNAME,
+      team_id: ITC_TEAM_ID,
+      changelog: lane_context[SharedValues::FL_CHANGELOG],  #ENV["changelog"],
+      beta_app_review_info: {
+           contact_email: ENV["contact_email"],
+           contact_first_name: ENV["contact_first_name"],
+           contact_last_name: ENV["contact_last_name"],
+           contact_phone: ENV["contact_phone"],
+           demo_account_name: ENV["demo_account_name"],
+           demo_account_password: ENV["demo_account_password"],
+           notes: ENV["notes"]
+         },
+     localized_app_info: {
+         "default": {
+             feedback_email: ENV["feedback_email"],
+             marketing_url: ENV["marketing_url"],
+             privacy_policy_url: ENV["privacy_policy_url"],
+             description: ENV["description"]
+           }
+         },
+     localized_build_info: {
+       "default": {
+         whats_new: ENV["whats_new"],
+       }
+     },
+      distribute_external: true,
+      skip_waiting_for_build_processing: false
+    )
+
+		clean_build_artifacts
+
+		add_git_tag(tag: "@Beta-" + get_version_number().to_s + "-" + get_build_number().to_s )
+		push_to_git_remote
+	 end
+
+	 desc "Upload application metadata to iTunes Connect"
+	 lane :metadata do
+
+	     deliver(
+	       metadata_path: "metadata/itunes-connect",
+	       ignore_language_directory_validation: true,
+	       force: true,
+	       skip_binary_upload: true,
+	       skip_screenshots: true,
+	       skip_metadata: false,
+	       automatic_release: false,
+	       submit_for_review: false
+	     )
+	 end
+
+	 desc "Upload application screenshots to iTunes Connect"
+	 lane :screenshots do
+
+	     deliver(
+	       metadata_path: "metadata/itunes-connect",
+	       screenshots_path: "metadata/itunes-connect/screenshots",
+	       ignore_language_directory_validation: true,
+	       force: true,
+	       skip_binary_upload: true,
+	       skip_screenshots: false,
+	       skip_metadata: true,
+	       automatic_release: false,
+	       submit_for_review: false
+	     )
+
+	 end
+
+
+
+  desc "Deploy a new version to the App Store"
+  lane :release do
+    # match(type: "appstore")
+    # snapshot
+    gym(scheme: "UdemyFastlane") # Build your app - more options available
+    deliver(force: true)
+    # frameit
+  end
+
+  # You can define as many lanes as you want
+
+  after_all do |lane|
+    # This block is called, only if the executed lane was successful
+
+    # slack(
+    #   message: "Successfully deployed new App Update."
+    # )
+  end
+
+  error do |lane, exception|
+    # slack(
+    #   message: exception.message,
+    #   success: false
+    # )
+  end
+end
+
+private_lane :puts_changelog do |options|
+  tag = options[:tag]
+
+  puts compare_url(tag: tag)
+
+  puts changelog_from_git_commits(
+    between: [tag, "HEAD"],
+    pretty: "- (%ae) %s",
+    match_lightweight_tag: false,
+    merge_commit_filtering: "exclude_merges"
+  )
+
+end
+
+after_all do |lane|
+  ship_it
+  notification( message: "Lane #{lane} completed successfully!")
+end
+
+error do |lane, exception|
+  puts "\n(╯°□°）╯︵ ┻━┻\n".red
+  notification(message: "Lane #{lane} failed to complete..")
+
+end
+
+# Helper functions
+def build_version
+  return sh("grep AssemblyInformationalVersion ../StaffLeaveAppGlobal/CommonAssemblyInfo.cs | awk -F '\"' '{print $2}'").strip
+end
+
+def last_beta
+  return sh("git describe origin/dev --match=\"beta*\" --tags --abbrev=0").strip
+end
+
+def last_release
+  return sh("git describe origin/master --match=\"release*\" --tags --abbrev=0").strip
+end
+
+def compare_url(options={})
+  tag = options[:tag]
+  head = last_git_commit[:abbreviated_commit_hash]
+
+  return "APP_GIT/APP_NAME/compare/#{tag}...#{head}"
+end
+
+def ship_it
+  rand = Random.rand(0..1)
+  if rand == 0
+    squirrel
+  elsif rand == 1
+    boat
+  end
+end
+
+def squirrel
+  puts "
+    !!!!
+  !!!!!!!!
+!!!!!!!!!!!   O_O
+!!!  !!!!!!! /@ @\\
+      !!!!!! \\ x /
+      !!!!!!/ m  !m
+       !!!!/ __  |
+       !!!!|/  \\__
+        !!!\\______\\
+  "
+end
+
+def boat
+  puts "
+     .  o ..
+     o . o o.o
+          ...oo
+            __[]__
+         __|_o_o_o\__
+         \\\"\"\"\"\"\"\"\"\"\"/
+          \\. ..  . /
+     ^^^^^^^^^^^^^^^^^^^^
+  "
+end

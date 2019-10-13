@@ -1,0 +1,15 @@
+# IOS config
+apple_id ENV["APPLE_ID"]  # Your Apple email address
+app_identifier ENV["APP_ID"]  # The bundle identifier of your app
+team_id ENV["TEAM_ID"]  # Developer Portal Team ID
+team_name ENV["TEAM_NAME"]  # Team name for your itunes connect account
+itc_team_name ENV["ITC_TEAM_NAME"]  # Team name for your itunes connect account
+itc_team_id ENV["ITC_TEAM_ID"]  # App Store Connect Team ID
+
+
+# Android config
+json_key_file ENV["JSON_KEY_FILE"]
+package_name ENV["PACKAGE_NAME"]
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile

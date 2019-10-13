@@ -1,0 +1,20 @@
+# For all available options run `match --help`
+####################################################################################
+
+# URL to the git repo containing all the certificates
+#git_url "https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/WHOCERTS"
+git_url "https://github.com/niihammond/AppleCerts"
+
+shallow_clone true
+
+# The default type, can be: appstore, adhoc or development
+type "appstore"
+
+# The bundle identifier of your app
+app_identifier ENV["APP_ID"]
+
+# Your Apple Developer Portal username
+username ENV["BOT_ID"]
+
+# The ID of your team if you're in multiple teams
+team_id ENV["TEAM_ID"]  # Developer Portal Team ID

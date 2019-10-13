@@ -1,0 +1,30 @@
+# For all available options run `deliver --help`
+####################################################################################
+
+# The bundle identifier of your app
+app_identifier ENV["APP_ID"]
+
+# Your Apple Developer Portal username
+username ENV["APPLE_ID"]
+
+# Set price tier to 0, indicating it’s a free app
+price_tier(0)
+
+# Answer the questions Apple would present to you upon manually submitting for review.
+submission_information({
+    export_compliance_encryption_updated: false,
+    export_compliance_uses_encryption: false,
+    content_rights_contains_third_party_content: false,
+    add_id_info_uses_idfa: false
+})
+
+# Provide the app rating configuration location.
+app_rating_config_path("./metadata/itunes-connect/ratings_config.json")
+# Set submit_for_review to true to automatically submit the app for review.
+submit_for_review(false)
+
+# Set automatic_release to false so you’ll have to release the app manually after it’s accepted by app review
+automatic_release(false)
+
+# Cause fastlane to skip screenshot and metadata approval
+force(true)

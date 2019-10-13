@@ -1,0 +1,12 @@
+Latest global tuberculosis data in your pocket! Discover current statistics and trends, compare countries and regions, and find the data you need at your fingertips.
+
+This app was created by the World Health Organization (WHO) to allow users to explore and interact with the data from the WHO 2019 Global Tuberculosis Report.
+
+FEATURES
+* Key facts on the tuberculosis epidemic
+* Data from 200+ countries and areas
+* Visualize statistics and trends for national, regional and global levels
+* Compare countries and regions
+* Quick search of indicators
+* Works offline – always have access to the data
+* Always free – public data compiled by WHO
