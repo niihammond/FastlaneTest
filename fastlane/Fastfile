@@ -132,7 +132,7 @@ platform :ios do
 	lane :certificates do
 	  match(type: "appstore", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
 	  match(type: "development", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
-	  match(type: "adhoc", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
+	  #match(type: "adhoc", readonly: true, force: false, app_identifier: APP_ID, team_id: ITC_TEAM_ID, username: ITC_USERNAME)
 	end
 
 	desc 'Create Push Notifications certs'
